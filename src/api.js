@@ -1,3 +1,31 @@
+// Backend base URL: empty when served by Express (same origin), or the Mac's
+// LAN address when running as a standalone Tizen/TV app.
+let _base = '';
+try { _base = localStorage.getItem('retlix-server') || ''; } catch {}
+export function getServerUrl() { return _base; }
+export function setServerUrl(url) { _base = url; try { localStorage.setItem('retlix-server', url); } catch {} }
+function u(path) { return _base + path; }
+
+// ---- Standalone TV mode: route through apiTV when Xtream is configured ----
+import { isConfigured as _xtreamConfigured } from './xtreamTV.js';
+import { apiTV as _apiTV, streamUrlTV as _streamUrlTV } from './apiTV.js';
+
+function _isDirect() { return _xtreamConfigured(); }
+
+// When running as a standalone TV app with server, API responses contain image URLs like
+// /api/image?url=... which are relative to the server. Rewrite them.
+function fixUrls(obj) {
+  if (!_base || _isDirect()) return obj;
+  if (typeof obj === 'string') return obj.startsWith('/api/') ? _base + obj : obj;
+  if (Array.isArray(obj)) return obj.map(fixUrls);
+  if (obj && typeof obj === 'object') {
+    var out = {};
+    for (var k in obj) out[k] = fixUrls(obj[k]);
+    return out;
+  }
+  return obj;
+}
+
 // Current UI language (set by the i18n layer) → sent to the server so it can
 // return localized plot/genre via TMDB.
 function lang() {
@@ -5,16 +33,18 @@ function lang() {
 }
 
 async function j(url, opts) {
-  const r = await fetch(url, opts);
+  const r = await fetch(u(url), opts);
   if (!r.ok) {
     let msg = `HTTP ${r.status}`;
     try { const e = await r.json(); if (e.error) msg = e.error; } catch {}
     throw new Error(msg);
   }
-  return r.json();
+  const data = await r.json();
+  return fixUrls(data);
 }
 
-export const api = {
+// Server-based API
+const _serverApi = {
   getProvider: () => j('/api/provider'),
   saveProvider: (body) =>
     j('/api/provider', {
@@ -45,6 +75,10 @@ export const api = {
   clearAllProgress: () => j('/api/progress', { method: 'DELETE' }),
   removeContinue: (type, id) => j(`/api/continue/${type}/${id}`, { method: 'DELETE' }),
 
+  getFavorites: () => Promise.resolve([]),
+  addFavorite: () => Promise.resolve([]),
+  removeFavorite: () => Promise.resolve([]),
+  isFavorite: () => Promise.resolve(false),
   getSettings: () => j('/api/settings'),
   saveSettings: (body) =>
     j('/api/settings', {
@@ -54,9 +88,22 @@ export const api = {
     }),
 };
 
+// Route to apiTV (standalone) or server API — no Proxy (Chrome 47 doesn't support it)
+var _apiRouter = {};
+var _allKeys = Object.keys(_serverApi);
+for (var _k in _apiTV) { if (_allKeys.indexOf(_k) < 0) _allKeys.push(_k); }
+_allKeys.forEach(function(key) {
+  _apiRouter[key] = function() {
+    var fn = _isDirect() && _apiTV[key] ? _apiTV[key] : _serverApi[key];
+    return fn.apply(null, arguments);
+  };
+});
+export var api = _apiRouter;
+
 export function streamUrl(type, id, ext) {
+  if (_isDirect()) return _streamUrlTV(type, id, ext);
   const q = ext ? `?ext=${encodeURIComponent(ext)}` : '';
-  return `/api/stream/${type}/${id}${q}`;
+  return u(`/api/stream/${type}/${id}${q}`);
 }
 
 // On-the-fly HLS transcode (for VOD containers the browser can't demux, e.g. MKV):
@@ -64,8 +111,8 @@ export function streamUrl(type, id, ext) {
 const hlsVodQ = (ext) => (ext ? `?ext=${encodeURIComponent(ext)}` : '');
 export function hlsVodMaster(type, id, ext, ss = 0) {
   const q = hlsVodQ(ext);
-  return `/api/hls/vod/${type}/${id}/master.m3u8${q}${ss > 0 ? (q ? '&' : '?') + 'ss=' + Math.floor(ss) : ''}`;
+  return u(`/api/hls/vod/${type}/${id}/master.m3u8${q}${ss > 0 ? (q ? '&' : '?') + 'ss=' + Math.floor(ss) : ''}`);
 }
-export function hlsVodFile(type, id, file, ext) { return `/api/hls/vod/${type}/${id}/${file}${hlsVodQ(ext)}`; }
-export function hlsVodTracks(type, id, ext) { return fetch(`/api/hls/vod/${type}/${id}/tracks.json${hlsVodQ(ext)}`).then((r) => r.json()); }
-export function stopHlsVod(type, id) { return fetch(`/api/hls/vod/${type}/${id}`, { method: 'DELETE', keepalive: true }).catch(() => {}); }
+export function hlsVodFile(type, id, file, ext) { return u(`/api/hls/vod/${type}/${id}/${file}${hlsVodQ(ext)}`); }
+export function hlsVodTracks(type, id, ext) { return fetch(u(`/api/hls/vod/${type}/${id}/tracks.json${hlsVodQ(ext)}`)).then((r) => r.json()); }
+export function stopHlsVod(type, id) { return fetch(u(`/api/hls/vod/${type}/${id}`), { method: 'DELETE', keepalive: true }).catch(() => {}); }

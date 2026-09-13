@@ -1,14 +1,15 @@
 <div align="center">
 
-# 🎬 Retlix
+# 🎬 Retflix
 
-**A self-hosted, Netflix-style web app for your IPTV line.**
+**A self-hosted, Netflix-style streaming app for your IPTV line — on web, mobile, and Samsung Smart TV.**
 
-Connect your **Xtream Codes** provider or any **M3U / M3U8** playlist, pull the whole catalog into a local database, and browse & watch movies, series and live TV with a slick, Netflix-grade interface — on your computer, phone, or smart-TV browser.
+Connect your **Xtream Codes** provider or any **M3U / M3U8** playlist, and enjoy a premium streaming experience with a Netflix-grade interface. Browse & watch movies, series, and live TV on your computer, phone, or Samsung Smart TV with a native Tizen app.
 
 ![Node](https://img.shields.io/badge/Node-%E2%89%A518-339933?logo=node.js&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![ffmpeg](https://img.shields.io/badge/ffmpeg-transcode-007808?logo=ffmpeg&logoColor=white)
+![Samsung TV](https://img.shields.io/badge/Samsung_TV-Tizen_3.0+-1428A0?logo=samsung&logoColor=white)
 ![Xtream](https://img.shields.io/badge/Xtream_Codes-supported-e50914)
 ![M3U](https://img.shields.io/badge/M3U%2FM3U8-supported-e50914)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
@@ -16,7 +17,7 @@ Connect your **Xtream Codes** provider or any **M3U / M3U8** playlist, pull the 
 </div>
 
 > [!IMPORTANT]
-> **Bring your own legal IPTV subscription.** Retlix ships with **no** content, channels, or credentials — it's only a player for an [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes) line or M3U/M3U8 playlist **you** already pay for. Not affiliated with Netflix. For personal use on your own network.
+> **Bring your own legal IPTV subscription.** Retflix ships with **no** content, channels, or credentials — it's only a player for an [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes) line or M3U/M3U8 playlist **you** already pay for. Not affiliated with Netflix. For personal use on your own network.
 
 ---
 
@@ -34,62 +35,73 @@ Connect your **Xtream Codes** provider or any **M3U / M3U8** playlist, pull the 
 - [Features](#-features)
 - [Quick start (Docker)](#-quick-start-docker)
 - [Manual install](#%EF%B8%8F-manual-install-without-docker)
+- [Samsung TV app](#-samsung-tv-app)
 - [Multilingual metadata (TMDB)](#-multilingual-metadata-tmdb)
 - [Configuration](#%EF%B8%8F-configuration)
 - [How it works](#-how-it-works)
 - [Project structure](#-project-structure)
 - [FAQ & limitations](#-faq--limitations)
-- [Publish to GitHub](#-publish-your-own-copy-to-github)
 - [License](#-license)
 
 ---
 
 ## ✨ Features
 
-**Library**
-- **Two provider types** at setup — choose between:
-  - **Xtream Codes** — paste server URL + username + password, validated on connect.
-  - **M3U / M3U8** — paste any playlist URL. Channels are auto-categorized (live, movies, series) from group tags.
-- Full catalog synced into a local **SQLite** database: categories, movies, series, live channels.
-- **Two sync modes** (Xtream), both incremental, resumable, and kept running even if you close the tab:
+### Library
+- **Two provider types** at setup:
+  - **Xtream Codes** — server URL + username + password, validated on connect.
+  - **M3U / M3U8** — any playlist URL; channels auto-categorized from group tags.
+- Full catalog synced into a local **SQLite** database (web mode) or **localStorage** (TV standalone mode).
+- **Two sync modes** (Xtream), both incremental and resumable:
   - **Update library** — provider details (plot, cast, director, episodes). Fast.
-  - **Download everything locally** — adds IMDb cast photos + pre-cached artwork.
-- M3U providers get a one-click **Refresh playlist** button to re-sync.
+  - **Download everything** — adds IMDb cast photos + pre-cached artwork.
 - On-disk **image cache** (posters, backdrops, episode stills, actor photos).
+- **Adult content filter** — automatically hides XXX/adult categories and content.
 
-**Discovery**
-- Netflix-style **home**: hero banner, *Continue Watching*, and recommendation rows (by category, lead actor, director).
-- **Browse** movies / series / live with category chips and sorting.
-- **Global search** across titles **and actors**, with as-you-type suggestions, typo-tolerant *"did you mean"*, and an **on-screen keyboard** (D-pad / mouse friendly for TVs). The query is stored in the URL, so **Back** restores your search and scroll position.
-- Rich **detail modal**: synopsis, cast with photos, year, rating, genre, director, trailer, seasons & episodes.
+### Discovery
+- Netflix-style **home**: hero banner (web) or quick navigation grid (TV), *Continue Watching*, *My List* (favorites), and recommendation rows.
+- **Browse** movies / series / live with category picker and sorting.
+- **Global search** across titles and actors, with suggestions, typo-tolerant *"did you mean"*, and TV-optimized debounced search.
+- Rich **detail page** (TV) or **modal** (web): synopsis, cast with photos, year, rating, genre, director, trailer, seasons & episodes.
+- **Favorites / My List** — add titles to your personal list, persisted in localStorage.
+- **Top 10** row with numbered cards for the most popular titles.
+- **"NUOVO" badge** on recently added content.
 
-**Player**
-- **Continuous, Netflix-style buffering**: stall watchdog with auto-recovery, transparent reconnect on drops, next-episode prefetch, debounced spinner.
-- Plays **MP4** natively; **MKV / AVI** stream through an on-the-fly **ffmpeg → HLS** pipeline so they actually play in the browser.
-- **Multi-audio language switching** and **subtitles** (extracted to WebVTT, Netflix-styled).
-- Hardware video encoding on macOS (`h264_videotoolbox`) so even 4K/HEVC transcodes in real time; `libx264` elsewhere.
-- Resume playback, *Continue Watching* sync, auto next-episode, Netflix-style scrubber, top-right info card, double-click fullscreen, full keyboard shortcuts.
+### Player
+- **Continuous, Netflix-style buffering**: stall watchdog with auto-recovery, transparent reconnect, next-episode prefetch, debounced spinner.
+- Plays **MP4** natively; **MKV / AVI** through on-the-fly **ffmpeg → HLS** (web) or native HLS (TV).
+- **Multi-audio language switching** and **subtitles** (WebVTT, Netflix-styled).
+- Hardware video encoding on macOS (`h264_videotoolbox`); `libx264` elsewhere.
+- Resume playback, *Continue Watching*, auto next-episode, full keyboard/remote shortcuts.
 
-**Languages**
-- Full **multilingual UI** — 🇮🇹 Italiano · 🇬🇧 English · 🇪🇸 Español · 🇫🇷 Français · 🇩🇪 Deutsch · 🇵🇹 Português. Auto-detects your browser language, switchable in Settings.
-- Optional **multilingual content** via [TMDB](#-multilingual-metadata-tmdb): plots & genres in the selected language.
+### Samsung Smart TV App
+- **Native Tizen app** (`.wgt`) — installs from Tizen Studio, appears in the TV's app launcher.
+- **Fully standalone** — connects directly to the Xtream Codes provider like IPTV Smarters. No server required for streaming.
+- **D-pad spatial navigation** — full remote control support (arrows, OK, Back).
+- **10-foot UI** — large text (24px+), big cards, visible focus rings, designed for viewing from 5 meters.
+- **Netflix-style splash screen** with animated loading bar.
+- **Category picker** — browse Film, Serie TV, Live TV with category grid selection.
+- **Live TV channel list** — text-based grid for quick channel selection.
+- **Player with seek** — skip ±10s with arrows, play/pause, volume, stall watchdog with auto-reconnect.
+- **Page state persistence** — Back button always returns to where you were (scroll position + focused element).
+- Compatible with **Samsung TVs 2017+** (Tizen 3.0, Chrome 47) — all CSS/JS transpiled for legacy browsers.
+
+### Languages
+- Full **multilingual UI** — 🇮🇹 Italiano · 🇬🇧 English · 🇪🇸 Español · 🇫🇷 Français · 🇩🇪 Deutsch · 🇵🇹 Português.
+- Optional **multilingual content** via [TMDB](#-multilingual-metadata-tmdb).
 
 ---
 
 ## 🚀 Quick start (Docker)
 
-The launcher detects your OS, checks Docker, builds the image (Node + ffmpeg + dependencies are installed **inside** the container), and starts everything:
-
 ```bash
-git clone https://github.com/<your-username>/retlix.git
-cd retlix
+git clone https://github.com/<your-username>/retflix.git
+cd retflix
 ./run.sh
 ```
 
-Then open **http://localhost:3000**, connect your provider, and run a sync.
-On a phone or TV, use the **network URL** that `run.sh` prints (e.g. `http://192.168.1.50:3000`).
-
-Prefer raw compose? Same thing:
+Open **http://localhost:3000**, connect your provider, and run a sync.
+On a phone or TV browser, use the network URL printed by `run.sh` (e.g. `http://192.168.1.50:3000`).
 
 ```bash
 docker compose up -d --build      # build + start
@@ -97,116 +109,178 @@ docker compose logs -f            # follow logs
 docker compose down               # stop
 ```
 
-Your library and credentials live in `./data` on the host (a mounted volume) — **never** baked into the image.
-
-> ✅ Verified: image builds on amd64/arm64, boots to the setup screen on a clean volume, ships ffmpeg + ffprobe, and the native SQLite module works out of the box.
+Your library and credentials live in `./data` on the host — **never** baked into the image.
 
 ---
 
 ## 🛠️ Manual install (without Docker)
 
-Requires **Node.js ≥ 18** and **ffmpeg** on your `PATH` (for MKV/AVI playback).
+Requires **Node.js ≥ 18** and **ffmpeg** on your `PATH`.
 
 ```bash
-git clone https://github.com/<your-username>/retlix.git
-cd retlix
+git clone https://github.com/<your-username>/retflix.git
+cd retflix
 npm install
-npm run build      # build the React UI
-npm start          # production server on http://localhost:3000
+npm run build
+npm start           # production → http://localhost:3000
 ```
 
-Development (hot-reload backend + Vite frontend):
+Development (hot-reload):
+```bash
+npm run dev         # or ./start.sh
+```
+
+---
+
+## 📺 Samsung TV App
+
+Retflix includes a standalone Samsung Tizen app that connects directly to your IPTV provider — no server needed for streaming.
+
+### Prerequisites
+- Samsung TV (2017 or newer, Tizen 3.0+)
+- [Tizen Studio](https://developer.tizen.org/development/tizen-studio/download) installed on your computer
+- TV in **Developer Mode** (Apps → press 1-2-3-4-5 → enable → set your PC's IP → restart TV)
+
+### Build & Install
 
 ```bash
-npm run dev        # or ./start.sh
+# Build the .wgt package
+./build-tizen.sh
+
+# Connect to your TV
+sdb connect <TV_IP>
+
+# Sign the package (use your Tizen certificate profile)
+tizen package -t wgt -s <ProfileName> -- tizen-build/
+
+# Install & launch
+tizen install -n tizen-build/Retflix.wgt -t <DeviceName>
+tizen run -p sVPRCHljlj.Retlix -t <DeviceName>
 ```
+
+### Configuration
+
+The TV app stores Xtream Codes credentials in localStorage. On first launch, configure your provider in **Settings** or pre-configure in `build-tizen.sh`:
+
+```bash
+# In build-tizen.sh, edit the provider line:
+localStorage.setItem("retflix-provider", JSON.stringify({
+  url: "http://your-provider.com",
+  username: "your_username",
+  password: "your_password"
+}))
+```
+
+### How it works on TV
+
+```
+Samsung TV (Tizen 3.0)
+  └─ Retflix.wgt (standalone web app)
+       ├─ React UI (legacy ES5 bundle for Chrome 47)
+       ├─ Xtream Codes API client (direct HTTP to provider)
+       ├─ Native HLS player (no hls.js needed)
+       ├─ D-pad spatial navigation engine
+       └─ localStorage (library cache, favorites, progress)
+              │
+              ▼
+       IPTV Provider (Xtream Codes API)
+         ├─ player_api.php → catalog, categories, details
+         ├─ /movie/user/pass/id.mp4 → direct movie stream
+         ├─ /series/user/pass/id.mp4 → direct episode stream
+         └─ /live/user/pass/id.m3u8 → direct live stream
+```
+
+No proxy, no intermediate server — the TV connects directly to the provider like IPTV Smarters.
 
 ---
 
 ## 🌍 Multilingual metadata (TMDB)
 
-The provider/IMDb serve metadata in a single language. To show **plots & genres in your chosen language**, add a free [TMDB](https://www.themoviedb.org/) API key:
+To show **plots & genres in your chosen language**, add a free [TMDB](https://www.themoviedb.org/) API key:
 
 1. Create a free account → **Settings → API** → copy the **API Key (v3 auth)**.
-2. In Retlix: **Settings → Language → "Plots & genres in other languages (TMDB)"** → paste the key → **Save**.
-   *(or set `TMDB_API_KEY` as an env var — see docker-compose.yml)*
-3. Pick a language and open a title — plots/genres appear translated and are cached.
-
-The key is stored in your local `data/` volume (never in the image, never returned by the API). Titles, category names and cast remain as the provider/IMDb provide them.
+2. In Retflix: **Settings → Language → TMDB** → paste the key → **Save**.
+3. Pick a language and open a title — translated content is cached locally.
 
 ---
 
 ## ⚙️ Configuration
-
-No secrets in code — your provider and TMDB key are configured **in the app** and stored locally in `data/`.
 
 | Variable        | Default   | Description                                       |
 |-----------------|-----------|---------------------------------------------------|
 | `PORT`          | `3000`    | HTTP port                                         |
 | `HOST`          | `0.0.0.0` | Bind address (default exposes it on the LAN)      |
 | `TMDB_API_KEY`  | —         | Optional; multilingual plots/genres (or set in UI)|
-| `SYNC_CONCURRENCY` | auto   | Override per-title sync parallelism               |
 
-The SQLite DB + image cache live in **`data/`** (gitignored & dockerignored). To start fresh, delete it or use **Settings → Disconnect**.
+The SQLite DB + image cache live in **`data/`** (gitignored). To start fresh, delete it or use **Settings → Disconnect**.
 
 ---
 
 ## 🧠 How it works
 
+### Web / Desktop mode
 ```
 Xtream / M3U ──────▶ Express backend ──▶ SQLite (local library + cache)
        │                    │
    TMDB / IMDb ─────────────┤  enrichment (plots, genres, cast photos, i18n)
                             │
-   browser  ◀── React UI ──┤  all streams & images are PROXIED through the
-   (hls.js / native)        │  backend, so provider credentials never reach it
-                            └─ ffmpeg ──▶ on-the-fly HLS for MKV/AVI
-                                          (video + multi-audio + WebVTT subs)
+   browser  ◀── React UI ──┤  streams & images PROXIED through backend
+   (hls.js / mpegts.js)     │  (credentials never reach the browser)
+                            └─ ffmpeg → on-the-fly HLS for MKV/AVI
 ```
 
-- **Backend** (Express + better-sqlite3): proxies every stream and image (hides credentials, avoids CORS), syncs & enriches the catalog, serves the API and the built UI.
-- **Frontend** (React + Vite): the Netflix-style UI; plays HLS via `hls.js` and progressive MP4 natively.
-- **Transcode** (ffmpeg): MP4 plays directly; MKV/AVI are transcoded to HLS on demand — video copied when already H.264 (or hardware-encoded), audio tracks exposed for language switching, subtitles converted to WebVTT.
+### Samsung TV mode
+```
+Samsung TV  ◀── Retflix.wgt ──▶  IPTV Provider (Xtream Codes)
+                    │                     │
+                    ├─ player_api.php ─────┤ catalog + details
+                    ├─ /movie/ ────────────┤ direct MP4 stream
+                    ├─ /live/ ─────────────┤ direct HLS stream
+                    └─ localStorage ───────┘ library cache + progress
+```
 
 ---
 
 ## 📁 Project structure
 
 ```
-server/        Express API, sync/enrichment, stream & image proxy, M3U parser, ffmpeg pipeline, TMDB
-src/           React app (pages, components, player, i18n)
-data/          SQLite DB + image cache  (created at runtime, never committed)
-Dockerfile     multi-stage build (compiles native deps, ships ffmpeg)
+server/            Express API, sync, stream proxy, M3U parser, ffmpeg, TMDB
+src/               React app — pages, components, player, i18n, TV hooks
+  ├─ pages/
+  │   ├─ Home.jsx        Home with hero (web) or quick nav (TV)
+  │   ├─ Browse.jsx      Browse with category picker (TV) or chips (web)
+  │   ├─ Search.jsx      Search with on-screen keyboard (web) or IME (TV)
+  │   ├─ Watch.jsx       Player (web — hls.js + mpegts.js)
+  │   ├─ WatchTV.jsx     Player (TV — native HLS, no JS libraries)
+  │   ├─ DetailTV.jsx    Full-page detail (TV — replaces modal)
+  │   └─ Settings.jsx    Settings (TV has simplified standalone view)
+  ├─ hooks/
+  │   ├─ useTv.js        TV detection, spatial navigation, back handling
+  │   └─ pageState.js    Save/restore scroll + focus for Back navigation
+  ├─ apiTV.js            Standalone Xtream API client (runs in browser)
+  ├─ xtreamTV.js         Xtream Codes URL builders + credential storage
+  └─ api.js              API router (server mode or standalone TV mode)
+tizen/             Samsung Tizen app config + icons
+build-tizen.sh     Build script for the .wgt Samsung TV package
+data/              SQLite DB + image cache (runtime, never committed)
+Dockerfile         Multi-stage build (Node + ffmpeg)
 docker-compose.yml
-run.sh         environment-aware one-command launcher
+run.sh             One-command Docker launcher
+start.sh           Dev mode launcher
+stop.sh            Port cleanup
 ```
 
 ---
 
 ## ❓ FAQ & limitations
 
-- **MKV/AVI need ffmpeg** — included in Docker; install it yourself for the manual setup.
-- **IMDb cast photos** come from a free, rate-limited API, so they fill in gradually; provider metadata is always primary.
-- **TMDB localization** covers plots & genres (on-demand, cached); titles & cast stay as provided.
+- **MKV/AVI need ffmpeg** — included in Docker; install manually otherwise.
+- **Samsung TV** requires Tizen 3.0+ (2017 models or newer) and Developer Mode for sideloading.
+- **TV app is standalone** — no server needed for streaming. The server is only needed for the web version (enrichment, transcoding, image caching).
+- **Adult content** is automatically filtered from the TV app home, search, and category listings.
+- **IMDb cast photos** are rate-limited; they fill in gradually.
 - **Single provider, single user, no app login** — run it on a network you trust.
-- Seeking inside a transcoded title restarts the transcode from the seek point on demand.
-
----
-
-## 📦 Publish your own copy to GitHub
-
-```bash
-cd retlix
-git init
-git add .
-git commit -m "Initial commit: Retlix"
-# create an empty repo named "retlix" on GitHub, then:
-git branch -M main
-git remote add origin https://github.com/<your-username>/retlix.git
-git push -u origin main
-```
-
-`.gitignore` already excludes `node_modules/`, `dist/`, and **`data/`** — so your library, credentials **and TMDB key never leave your machine**. Run `git status` and confirm `data/` is not staged before pushing.
+- **localStorage limit** (~5MB) — the TV caches the library in a compact array format to fit.
 
 ---
 

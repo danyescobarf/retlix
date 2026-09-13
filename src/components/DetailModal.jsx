@@ -26,11 +26,25 @@ export default function DetailModal({ type, id, onClose }) {
   }, [type, id]);
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
+    const onKey = (e) => {
+      var code = e.keyCode || e.which;
+      if (e.key === 'Escape' || code === 27 || code === 10009) { e.preventDefault(); e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', onKey, true);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    // Focus handled by item effect below
+    return () => { document.removeEventListener('keydown', onKey, true); document.body.style.overflow = ''; };
   }, [onClose]);
+
+  // Focus the Play/Watch button when modal content loads
+  useEffect(() => {
+    if (!item) return;
+    setTimeout(function() {
+      var btn = document.querySelector('.modal .btn-play[data-focusable]');
+      if (!btn) btn = document.querySelector('.modal [data-focusable]');
+      if (btn) btn.focus();
+    }, 100);
+  }, [item]);
 
   const bg = item?.backdrop || item?.icon || '';
 
@@ -49,7 +63,7 @@ export default function DetailModal({ type, id, onClose }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <button className="modal-close" onClick={onClose} aria-label="Chiudi"><Icon name="close" size={20} /></button>
+        <button className="modal-close" onClick={onClose} aria-label="Chiudi" data-focusable><Icon name="close" size={20} /></button>
         {!item ? (
           <div style={{ padding: 60 }}><Loader label="Caricamento…" /></div>
         ) : (
@@ -58,10 +72,10 @@ export default function DetailModal({ type, id, onClose }) {
               <div className="modal-hero-content">
                 <h2>{item.name}</h2>
                 <div className="hero-actions">
-                  {type === 'movie' && <button className="btn btn-play" onClick={playMovie}><Icon name="play" size={18} /> {t('Riproduci')}</button>}
-                  {type === 'live' && <button className="btn btn-play" onClick={playMovie}><Icon name="play" size={18} /> {t('Guarda in diretta')}</button>}
+                  {type === 'movie' && <button className="btn btn-play" onClick={playMovie} data-focusable><Icon name="play" size={18} /> {t('Riproduci')}</button>}
+                  {type === 'live' && <button className="btn btn-play" onClick={playMovie} data-focusable><Icon name="play" size={18} /> {t('Guarda in diretta')}</button>}
                   {item.trailer && (
-                    <a className="btn btn-info" href={`https://www.youtube.com/watch?v=${item.trailer}`} target="_blank" rel="noreferrer"><Icon name="play" size={18} /> Trailer</a>
+                    <a className="btn btn-info" href={`https://www.youtube.com/watch?v=${item.trailer}`} target="_blank" rel="noreferrer" data-focusable tabIndex={0}><Icon name="play" size={18} /> Trailer</a>
                   )}
                 </div>
               </div>
@@ -103,13 +117,13 @@ export default function DetailModal({ type, id, onClose }) {
                 <>
                   <div className="season-head">
                     <h3>{t('Episodi')}</h3>
-                    <select className="select" value={season || ''} onChange={(e) => setSeason(e.target.value)}>
+                    <select className="select" value={season || ''} onChange={(e) => setSeason(e.target.value)} data-focusable>
                       {seasonKeys.map((s) => <option key={s} value={s}>{t('Stagione {n}', { n: s })}</option>)}
                     </select>
                   </div>
                   <div>
                     {(item.seasons[season] || []).map((ep, idx) => (
-                      <div className="episode" key={ep.id} onClick={() => playEpisode(ep, idx)}>
+                      <div className="episode" key={ep.id} onClick={() => playEpisode(ep, idx)} tabIndex={0} data-focusable onKeyDown={(e) => { if ((e.keyCode || e.which) === 13 || e.key === 'Enter') playEpisode(ep, idx); }}>
                         <div className="episode-num">{ep.episode_num}</div>
                         {ep.still
                           ? <img className="episode-still" src={ep.still} alt="" loading="lazy" />

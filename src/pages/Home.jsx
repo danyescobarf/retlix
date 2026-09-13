@@ -3,17 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useUI } from '../App.jsx';
 import { useI18n } from '../i18n.js';
+import { useTV } from '../hooks/useTv.js';
 import Hero from '../components/Hero.jsx';
 import Row from '../components/Row.jsx';
 import Loader from '../components/Loader.jsx';
+import Icon from '../components/Icons.jsx';
+import { savePageState, restorePageState } from '../hooks/pageState.js';
 
 export default function Home() {
   const { openDetail } = useUI();
   const { t } = useI18n();
+  const { isTV } = useTV();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [progress, setProgress] = useState([]);
   const [progressMap, setProgressMap] = useState({});
+  const [favorites, setFavorites] = useState([]);
 
   const loadProgress = useCallback(async () => {
     try {
@@ -28,12 +33,17 @@ export default function Home() {
   useEffect(() => {
     api.home().then(setData).catch(() => setData({ hero: null, rows: [] }));
     loadProgress();
+    api.getFavorites().then(setFavorites).catch(function() {});
   }, [loadProgress]);
 
   const onItem = (item) => {
+    savePageState('home');
     if (item.type === 'live') navigate(`/watch/${item.type}/${item.id}`);
     else openDetail(item.type, item.id);
   };
+
+  // Restore on mount
+  useEffect(() => { restorePageState('home', 400); }, []);
 
   // Continue Watching jumps straight back into playback (movie resumes from its
   // saved position; a series resumes the exact episode it left off).
@@ -67,17 +77,50 @@ export default function Home() {
 
   return (
     <div>
-      <Hero item={data.hero} onMore={(it) => openDetail(it.type, it.id)} />
+      {/* Desktop: hero banner */}
+      {!isTV && <Hero item={data.hero} onMore={(it) => openDetail(it.type, it.id)} />}
+
+      {/* TV: quick navigation — no hero, autofocus on Live TV */}
+      {isTV && (
+        <div className="tv-quick-nav" data-focus-group>
+          <button className="tv-quick-btn" data-focusable onClick={() => navigate('/live')} id="tv-home-live">
+            <Icon name="volume" size={36} />
+            <span>{t('Live TV')}</span>
+          </button>
+          <button className="tv-quick-btn" data-focusable onClick={() => navigate('/movies')}>
+            <Icon name="play" size={36} />
+            <span>{t('Film')}</span>
+          </button>
+          <button className="tv-quick-btn" data-focusable onClick={() => navigate('/series')}>
+            <Icon name="list" size={36} />
+            <span>{t('Serie TV')}</span>
+          </button>
+          <button className="tv-quick-btn" data-focusable onClick={() => navigate('/search')}>
+            <Icon name="search" size={36} />
+            <span>{t('Cerca')}</span>
+          </button>
+          <button className="tv-quick-btn" data-focusable onClick={() => navigate('/settings')}>
+            <Icon name="settings" size={36} />
+            <span>{t('Impostazioni')}</span>
+          </button>
+        </div>
+      )}
+
       <div className="rows">
         {continueItems.length > 0 && (
           <Row title={t('Continua a guardare')} items={continueItems} poster progressMap={continueProgress} onItem={onContinue} onRemove={removeContinue} />
         )}
+        {favorites.length > 0 && (
+          <Row title={t('La mia lista')} items={favorites} poster onItem={onItem} />
+        )}
         {recommended.map((r, i) => (
           <Row key={'rec' + i} title={r.titleKey ? t(r.titleKey, r.titleParams) : r.title} items={r.items} poster={r.type !== 'live'} progressMap={progressMap} onItem={onItem} />
         ))}
-        {(data.rows || []).map((r, i) => (
-          <Row key={i} title={r.titleKey ? t(r.titleKey, r.titleParams) : r.title} items={r.items} poster={r.type !== 'live'} progressMap={progressMap} onItem={onItem} />
-        ))}
+        {(data.rows || []).map((r, i) => {
+          var rowTitle = r.titleKey ? t(r.titleKey, r.titleParams) : r.title;
+          var isTop = rowTitle && (rowTitle.indexOf('votati') >= 0 || rowTitle.indexOf('Top') >= 0 || rowTitle.indexOf('top') >= 0);
+          return <Row key={i} title={isTop && isTV ? 'Top 10' : rowTitle} items={r.items} poster={r.type !== 'live'} progressMap={progressMap} onItem={onItem} numbered={isTop} />;
+        })}
         {(!data.rows || data.rows.length === 0) && (
           <div className="empty">{t('La tua libreria è vuota. Prova a ri-sincronizzare dalle Impostazioni.')}</div>
         )}

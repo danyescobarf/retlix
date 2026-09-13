@@ -3,3 +3,11 @@ dist/
 data/
 *.log
 .DS_Store
+
+# Tizen TV build output
+tizen-build/
+*.wgt
+
+# Tizen certificates (contain device-specific keys)
+tizen/
+!tizen/config.xml

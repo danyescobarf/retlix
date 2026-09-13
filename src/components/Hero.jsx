@@ -31,8 +31,8 @@ export default function Hero({ item, onMore }) {
         </div>
         {item.plot && <p className="hero-plot">{item.plot}</p>}
         <div className="hero-actions">
-          <button className="btn btn-play" onClick={play}><Icon name="play" size={18} /> {t('Riproduci')}</button>
-          <button className="btn btn-info" onClick={() => onMore(item)}><Icon name="info" size={18} /> {t('Altre info')}</button>
+          <button className="btn btn-play" onClick={play} data-focusable><Icon name="play" size={18} /> {t('Riproduci')}</button>
+          <button className="btn btn-info" onClick={() => onMore(item)} data-focusable><Icon name="info" size={18} /> {t('Altre info')}</button>
         </div>
       </div>
     </div>

@@ -60,7 +60,7 @@ function guessType(group, url, name) {
 
 // Try to extract series name and season/episode from a title like:
 // "Breaking Bad S01 E03", "The Office 2x05", "Narcos Stagione 3 Episodio 7"
-const SERIES_RE = /^(.+?)\s*[–—-]?\s*(?:s(\d{1,2})\s*e(\d{1,3})|(\d{1,2})x(\d{1,3})|(?:stagione|season|saison|staffel)\s*(\d{1,2})(?:\s*(?:episodio|episode|ep\.?|épisode|folge)\s*(\d{1,3}))?)/i;
+const SERIES_RE = /^(.+?)\s*[–—-]?\s*(?:s(\d{1,4})\s*e(\d{1,3})|(\d{1,2})x(\d{1,3})|(?:stagione|season|saison|staffel)\s*(\d{1,4})(?:\s*(?:episodio|episode|ep\.?|épisode|folge)\s*(\d{1,3}))?)/i;
 
 function parseSeriesTitle(name) {
   const m = SERIES_RE.exec(name);

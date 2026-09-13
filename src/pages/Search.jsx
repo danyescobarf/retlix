@@ -3,7 +3,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useUI } from '../App.jsx';
 import { useI18n } from '../i18n.js';
+import { useTV } from '../hooks/useTv.js';
 import Card from '../components/Card.jsx';
+import Row from '../components/Row.jsx';
 import Loader from '../components/Loader.jsx';
 import Icon from '../components/Icons.jsx';
 import Avatar from '../components/Avatar.jsx';
@@ -15,6 +17,7 @@ export default function Search() {
   const urlActor = params.get('actor') || '';
   const { openDetail } = useUI();
   const { t } = useI18n();
+  const { isTV } = useTV();
   const navigate = useNavigate();
 
   const [text, setText] = useState(urlQ);
@@ -24,12 +27,10 @@ export default function Search() {
   const debRef = useRef(null);
   const inputRef = useRef(null);
 
-  // autofocus only when starting a fresh search — NOT in actor mode (focusing
-  // there would otherwise trigger an exit and strip the ?actor= param).
-  useEffect(() => { if (!urlActor) inputRef.current?.focus(); }, []);
+  // autofocus only when starting a fresh search — NOT in actor mode
+  useEffect(() => { if (!urlActor && !isTV) inputRef.current?.focus(); }, []);
 
-  // Fetch is driven by the URL. Actor mode short-circuits the text search; the
-  // alive guards stop a stale text-search from clobbering the actor results.
+  // Fetch is driven by the URL
   useEffect(() => {
     if (!urlActor) { setText(urlQ); return; }
     setText('');
@@ -44,11 +45,9 @@ export default function Search() {
     return () => { alive = false; };
   }, [urlQ, urlActor]);
 
-  // Mirror the typed query into the URL (?q=) with replace, so pressing Play and
-  // then Back restores the search. Debounced + replace keeps history clean and
-  // (with the key change in App.jsx) doesn't remount/steal focus while typing.
+  // Mirror typed query into URL — TV: skip URL sync (causes re-renders)
   useEffect(() => {
-    if (urlActor) return;
+    if (urlActor || isTV) return;
     const q = text.trim();
     if (q === urlQ) return;
     const t = setTimeout(() => setSearchParams(q ? { q } : {}, { replace: true }), 400);
@@ -56,23 +55,29 @@ export default function Search() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, urlActor]);
 
-  // Instant search + suggestions while typing (non-actor mode, debounced).
+  // Instant search + suggestions while typing
   useEffect(() => {
     if (urlActor) return;
     const q = text.trim();
     clearTimeout(debRef.current);
-    if (q.length < 2) { setSuggest({ titles: [], actors: [] }); setResults(null); setLoading(false); return; }
+    var minLen = isTV ? 3 : 2;
+    var delay = isTV ? 800 : 220;
+    if (q.length < minLen) { setSuggest({ titles: [], actors: [] }); setResults(null); setLoading(false); return; }
     let alive = true;
     setLoading(true);
     debRef.current = setTimeout(() => {
-      api.suggest(q).then((s) => alive && setSuggest(s)).catch(() => alive && setSuggest({ titles: [], actors: [] }));
-      api.search({ q }).then((r) => alive && setResults(r)).catch(() => alive && setResults(null)).finally(() => alive && setLoading(false));
-    }, 220);
+      // TV: only call search (not suggest separately — it's redundant)
+      if (isTV) {
+        api.search({ q }).then((r) => alive && setResults(r)).catch(() => alive && setResults(null)).finally(() => alive && setLoading(false));
+      } else {
+        api.suggest(q).then((s) => alive && setSuggest(s)).catch(() => alive && setSuggest({ titles: [], actors: [] }));
+        api.search({ q }).then((r) => alive && setResults(r)).catch(() => alive && setResults(null)).finally(() => alive && setLoading(false));
+      }
+    }, delay);
     return () => { alive = false; clearTimeout(debRef.current); };
   }, [text, urlActor]);
 
-  // Remember the scroll position per query, so returning from a title (Back from
-  // /watch) lands you where you were, not at the top.
+  // Scroll position persistence
   const scrollKey = `search-scroll:${urlActor ? 'actor:' + urlActor : 'q:' + urlQ}`;
   const restoredRef = useRef(false);
   useEffect(() => () => { try { sessionStorage.setItem(scrollKey, String(window.scrollY)); } catch {} }, [scrollKey]);
@@ -89,18 +94,101 @@ export default function Search() {
   };
   const pickActor = (name) => navigate('/search?actor=' + encodeURIComponent(name));
   const exitActor = () => navigate('/search' + (text ? '?q=' + encodeURIComponent(text) : ''));
-  const clearAll = () => { setText(''); setResults(null); setSuggest({ titles: [], actors: [] }); navigate('/search'); inputRef.current?.focus(); };
+  const clearAll = () => { setText(''); setResults(null); setSuggest({ titles: [], actors: [] }); navigate('/search'); if (!isTV) inputRef.current?.focus(); };
 
-  // On-screen keyboard handlers (TV remote / mouse). They edit `text`, which
-  // drives the same debounced search as physical typing. Disabled in actor mode.
+  // On-screen keyboard handlers
   const kbType = (ch) => { if (!urlActor) setText((t) => t + ch); };
   const kbBackspace = () => { if (!urlActor) setText((t) => t.slice(0, -1)); };
   const kbSpace = () => { if (!urlActor) setText((t) => t + ' '); };
+
+  // TV: handle Down arrow to escape input, Back to go back
+  const tvInputKeyDown = (e) => {
+    if (!isTV) return;
+    var code = e.keyCode || e.which;
+    // Down arrow: blur input and focus first result
+    if (code === 40) {
+      e.preventDefault();
+      if (inputRef.current) inputRef.current.blur();
+      setTimeout(function() {
+        var firstCard = document.querySelector('.tv-search-results [data-focusable]');
+        if (firstCard) firstCard.focus();
+      }, 100);
+    }
+    // Back: blur and navigate back
+    if (code === 10009) {
+      e.preventDefault();
+      if (inputRef.current) inputRef.current.blur();
+      navigate(-1);
+    }
+  };
 
   const r = results || {};
   const totalTitles = (r.movies?.length || 0) + (r.series?.length || 0) + (r.live?.length || 0);
   const hasQuery = urlActor || text.trim().length >= 2;
 
+  // --- TV LAYOUT ---
+  if (isTV) {
+    return (
+      <div className="page tv-search">
+        {/* Search bar — big, simple */}
+        <div className="tv-search-bar">
+          <Icon name="search" size={32} />
+          <input
+            ref={inputRef}
+            value={urlActor ? urlActor : text}
+            readOnly={!!urlActor}
+            onChange={(e) => setText(e.target.value)}
+            onClick={() => { if (urlActor) clearAll(); }}
+            onKeyDown={tvInputKeyDown}
+            placeholder={t('Cerca film, serie, attori…')}
+            data-focusable
+          />
+          {(text || urlActor) && (
+            <button className="tv-search-clear" onClick={clearAll} data-focusable><Icon name="close" size={28} /></button>
+          )}
+        </div>
+
+        {/* Results */}
+        <div className="tv-search-results">
+          {!hasQuery && (
+            <div className="tv-search-hint">
+              <Icon name="search" size={64} />
+              <p>{t('Cerca tra film, serie e attori.')}</p>
+              <p>{t('Premi OK per aprire la tastiera.')}</p>
+            </div>
+          )}
+
+          {hasQuery && loading && !results && (
+            <div style={{ padding: 60 }}><Loader label={t('Ricerca…')} /></div>
+          )}
+
+          {hasQuery && results && totalTitles === 0 && (
+            <div className="empty">{t('Nessun risultato')}{urlActor ? '' : ' per "' + text.trim() + '"'}.</div>
+          )}
+
+          {urlActor && (
+            <div style={{ marginBottom: 20 }}>
+              <button className="btn btn-info" onClick={exitActor} data-focusable>
+                <Icon name="back" size={22} /> {t('Tutti i risultati')}
+              </button>
+            </div>
+          )}
+
+          {r.movies && r.movies.length > 0 && (
+            <Row title={t('Film')} items={r.movies.slice(0, 10)} poster onItem={onItem} />
+          )}
+          {r.series && r.series.length > 0 && (
+            <Row title={t('Serie TV')} items={r.series.slice(0, 10)} poster onItem={onItem} />
+          )}
+          {r.live && r.live.length > 0 && (
+            <Row title={t('Live TV')} items={r.live.slice(0, 10)} onItem={onItem} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- DESKTOP / MOBILE LAYOUT (unchanged) ---
   const Section = ({ title, items, poster }) =>
     items && items.length ? (
       <section className="search-section">
@@ -113,7 +201,6 @@ export default function Search() {
 
   return (
     <div className="page search-page">
-      {/* search field */}
       <div className="search-bar">
         <Icon name="search" size={22} />
         <input
@@ -130,7 +217,6 @@ export default function Search() {
         )}
       </div>
 
-      {/* On-screen keyboard (Netflix-style) — for TV remotes & touch. */}
       {!urlActor && (
         <SearchKeyboard onKey={kbType} onBackspace={kbBackspace} onSpace={kbSpace} onClear={clearAll} />
       )}
@@ -142,7 +228,6 @@ export default function Search() {
         </div>
       ) : (
         <div className="search-layout">
-          {/* left: suggestions */}
           <aside className="search-side">
             {urlActor && (
               <button className="search-back" onClick={exitActor}><Icon name="back" size={18} /> {t('Tutti i risultati')}</button>
@@ -179,13 +264,12 @@ export default function Search() {
             )}
           </aside>
 
-          {/* right: results */}
           <div className="search-results">
             {urlActor && <h1 className="search-actor-title">{t('Con {actor}', { actor: urlActor })}</h1>}
             {loading && !results && <div style={{ padding: 40 }}><Loader label={t('Ricerca…')} /></div>}
             {results && totalTitles === 0 && !r.actors?.length && (
               <div className="empty">
-                {t('Nessun risultato')}{urlActor ? '' : ` ${t('per')} “${text.trim()}”`}.
+                {t('Nessun risultato')}{urlActor ? '' : ` ${t('per')} "${text.trim()}"`}.
                 {r.didYouMean && <> {t('Forse cercavi')} <button className="linklike" onClick={() => setText(r.didYouMean)}>{r.didYouMean}</button>?</>}
               </div>
             )}

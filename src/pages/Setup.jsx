@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, getServerUrl } from '../api.js';
 import { useUI } from '../App.jsx';
 import { useI18n } from '../i18n.js';
+import { isConfigured as xtreamConfigured } from '../xtreamTV.js';
 
 export default function Setup() {
   const { refreshStatus } = useUI();
@@ -18,7 +19,7 @@ export default function Setup() {
 
   const startSync = () => {
     setSync({ stage: 'start', message: t('Connessione…'), percent: 0, counts: {} });
-    const es = new EventSource('/api/sync');
+    const es = new EventSource(getServerUrl() + '/api/sync');
     es.onmessage = (ev) => {
       let data; try { data = JSON.parse(ev.data); } catch { return; }
       if (data.log !== undefined) return;
@@ -47,6 +48,12 @@ export default function Setup() {
       } else {
         await api.saveProvider({ type: 'xtream', url: form.url, username: form.username, password: form.password });
       }
+      // Direct/TV mode: no sync needed, data fetched on-demand from provider
+      if (xtreamConfigured()) {
+        await refreshStatus();
+        navigate('/');
+        return;
+      }
       startSync();
     } catch (err) {
       setError(err.message);
@@ -60,7 +67,7 @@ export default function Setup() {
     return (
       <div className="sync-screen">
         <div className="sync-box">
-          <div className="logo">RETLIX</div>
+          <div className="logo">RETFLIX</div>
           <div className="sync-stage">{sync.stage === 'complete' ? t('Fatto!') : t('Creazione della libreria…')}</div>
           <div className="sync-msg">{sync.message || ''}</div>
           <div className="progress-track"><div className="progress-fill" style={{ width: (sync.percent || 0) + '%' }} /></div>
@@ -77,7 +84,7 @@ export default function Setup() {
   return (
     <div className="setup">
       <form className="setup-card" onSubmit={submit}>
-        <div className="logo">RETLIX</div>
+        <div className="logo">RETFLIX</div>
         <div className="sub">{t('Collega la tua linea IPTV per iniziare')}</div>
 
         <div className="setup-tabs">

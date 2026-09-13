@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import mpegts from 'mpegts.js';
 import Hls from 'hls.js';
-import { api, streamUrl, hlsVodMaster, hlsVodFile, hlsVodTracks, stopHlsVod } from '../api.js';
+import { api, streamUrl, hlsVodMaster, hlsVodFile, hlsVodTracks, stopHlsVod, getServerUrl } from '../api.js';
 import { useI18n } from '../i18n.js';
 import Icon from '../components/Icons.jsx';
 
@@ -189,7 +189,8 @@ export default function Watch() {
         if (resumeAt > 5 && resumeAt < (video.duration || Infinity) - 5) video.currentTime = resumeAt;
         video.play().catch(() => {});
       };
-      video.addEventListener('loadedmetadata', onMeta, { once: true });
+      var onMetaWrap = function() { video.removeEventListener('loadedmetadata', onMetaWrap); onMeta(); };
+      video.addEventListener('loadedmetadata', onMetaWrap);
       video.textTracks && (video.textTracks.onaddtrack = readTracks);
     };
 
@@ -247,9 +248,12 @@ export default function Watch() {
       loadSubs(); // fire-and-forget; doesn't depend on the offset
 
       const onReady = () => { readTracks(); video.play().catch(() => {}); };
-      if (video.canPlayType('application/vnd.apple.mpegurl') && !Hls.isSupported()) {
-        video.src = master; // Safari native HLS
-        video.addEventListener('loadedmetadata', onReady, { once: true });
+      // Prefer native HLS on Samsung TV / Safari (avoids hls.js compat issues on older browsers)
+      const isTizenOrSafari = /Tizen|AppleWebKit.*Version/.test(navigator.userAgent);
+      if (video.canPlayType('application/vnd.apple.mpegurl') && (isTizenOrSafari || !Hls.isSupported())) {
+        video.src = master; // Native HLS (Samsung TV / Safari)
+        var onReadyWrap = function() { video.removeEventListener('loadedmetadata', onReadyWrap); onReady(); };
+        video.addEventListener('loadedmetadata', onReadyWrap);
       } else if (Hls.isSupported()) {
         const hls = new Hls({ enableWorker: true, maxBufferLength: 30, maxMaxBufferLength: 60 });
         hlsRef.current = hls;
@@ -284,7 +288,7 @@ export default function Watch() {
     // stay server-side). Used when the browser/codec can't play the raw MPEG-TS.
     const startHls = () => {
       if (destroyed) return;
-      const src = `/api/hls/live/${id}`;
+      const src = (getServerUrl ? getServerUrl() : '') + '/api/hls/live/' + id;
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = src; // Safari plays HLS natively
         video.play().catch(() => {});
@@ -611,19 +615,19 @@ export default function Watch() {
     const onKey = (e) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
       poke();
-      switch (e.key) {
-        case ' ': case 'k': e.preventDefault(); togglePlay(); break;
-        case 'ArrowLeft': case 'j': skip(-10); break;
-        case 'ArrowRight': case 'l': skip(10); break;
-        case 'ArrowUp': changeVol(Math.min(1, (videoRef.current?.volume || 0) + 0.1)); break;
-        case 'ArrowDown': changeVol(Math.max(0, (videoRef.current?.volume || 0) - 0.1)); break;
-        case 'f': toggleFs(); break;
-        case 'm': toggleMute(); break;
-        case 'n': nextEp(); break;
-        case 'p': prevEp(); break;
-        case 'Escape': if (!document.fullscreenElement) navigate(-1); break;
-        default: break;
-      }
+      var code = e.keyCode || e.which;
+      var key = e.key || '';
+      // Support both e.key (desktop) and e.keyCode (Samsung TV)
+      if (key === ' ' || key === 'k' || code === 32 || code === 75 || code === 415 /* MediaPlay */ || code === 19 /* MediaPause */) { e.preventDefault(); togglePlay(); }
+      else if (key === 'ArrowLeft' || key === 'j' || code === 37 || code === 74 || code === 412 /* MediaRewind */) skip(-10);
+      else if (key === 'ArrowRight' || key === 'l' || code === 39 || code === 76 || code === 417 /* MediaFastForward */) skip(10);
+      else if (key === 'ArrowUp' || code === 38) changeVol(Math.min(1, (videoRef.current ? videoRef.current.volume : 0) + 0.1));
+      else if (key === 'ArrowDown' || code === 40) changeVol(Math.max(0, (videoRef.current ? videoRef.current.volume : 0) - 0.1));
+      else if (key === 'f' || code === 70) toggleFs();
+      else if (key === 'm' || code === 77) toggleMute();
+      else if (key === 'n' || code === 78) nextEp();
+      else if (key === 'p' || code === 80) prevEp();
+      else if (key === 'Escape' || code === 27 || code === 10009) { if (!document.fullscreenElement) navigate(-1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -662,7 +666,7 @@ export default function Watch() {
 
       {/* top bar */}
       <div className={'pl-top' + (showUI ? '' : ' hidden')}>
-        <button className="pl-iconbtn" onClick={() => navigate(-1)} aria-label={t("Indietro")}><Icon name="back" size={26} /></button>
+        <button className="pl-iconbtn" data-focusable onClick={() => navigate(-1)} aria-label={t("Indietro")}><Icon name="back" size={26} /></button>
         <div className="pl-title">{source?.title || detail?.name || ''}</div>
       </div>
 
@@ -686,17 +690,17 @@ export default function Watch() {
       {/* center cluster */}
       {!error && (
         <div className={'pl-center' + (showUI ? '' : ' hidden')}>
-          {isSeries && <button className="pl-bigbtn" onClick={prevEp} disabled={current === 0} title={t("Episodio precedente (p)")}><Icon name="prev" size={26} /></button>}
-          <button className="pl-bigbtn" onClick={() => skip(-10)} title={t("Indietro 10s (←)")}><Icon name="back10" size={28} /><span>10</span></button>
-          <button className="pl-bigbtn play" onClick={togglePlay} title={t("Riproduci/Pausa (spazio)")}><Icon name={playing ? 'pause' : 'play'} size={34} /></button>
-          <button className="pl-bigbtn" onClick={() => skip(10)} title={t("Avanti 10s (→)")}><Icon name="forward10" size={28} /><span>10</span></button>
-          {isSeries && <button className="pl-bigbtn" onClick={nextEp} disabled={current >= flat.length - 1} title={t("Episodio successivo (n)")}><Icon name="next" size={26} /></button>}
+          {isSeries && <button className="pl-bigbtn" data-focusable onClick={prevEp} disabled={current === 0} title={t("Episodio precedente (p)")}><Icon name="prev" size={26} /></button>}
+          <button className="pl-bigbtn" data-focusable onClick={() => skip(-10)} title={t("Indietro 10s (←)")}><Icon name="back10" size={28} /><span>10</span></button>
+          <button className="pl-bigbtn play" data-focusable onClick={togglePlay} title={t("Riproduci/Pausa (spazio)")}><Icon name={playing ? 'pause' : 'play'} size={34} /></button>
+          <button className="pl-bigbtn" data-focusable onClick={() => skip(10)} title={t("Avanti 10s (→)")}><Icon name="forward10" size={28} /><span>10</span></button>
+          {isSeries && <button className="pl-bigbtn" data-focusable onClick={nextEp} disabled={current >= flat.length - 1} title={t("Episodio successivo (n)")}><Icon name="next" size={26} /></button>}
         </div>
       )}
 
       {/* next-episode prompt */}
       {showNext && (
-        <button className="pl-next-prompt" onClick={nextEp}><Icon name="play" size={16} /> {t("Episodio successivo")}</button>
+        <button className="pl-next-prompt" onClick={nextEp} data-focusable><Icon name="play" size={16} /> {t("Episodio successivo")}</button>
       )}
 
       {/* bottom controls */}
@@ -712,21 +716,21 @@ export default function Watch() {
             />
           </div>
           <div className="pl-controls">
-            <button className="pl-iconbtn" onClick={togglePlay}><Icon name={playing ? 'pause' : 'play'} size={20} /></button>
+            <button className="pl-iconbtn" data-focusable onClick={togglePlay}><Icon name={playing ? 'pause' : 'play'} size={20} /></button>
             <button className="pl-iconbtn pl-skip" onClick={() => skip(-10)} title={t("Indietro 10s")}><Icon name="back10" size={20} /></button>
             <button className="pl-iconbtn pl-skip" onClick={() => skip(10)} title={t("Avanti 10s")}><Icon name="forward10" size={20} /></button>
             <div className="pl-vol">
-              <button className="pl-iconbtn" onClick={toggleMute}><Icon name={muted || volume === 0 ? 'mute' : 'volume'} size={20} /></button>
+              <button className="pl-iconbtn" data-focusable onClick={toggleMute}><Icon name={muted || volume === 0 ? 'mute' : 'volume'} size={20} /></button>
               <input type="range" min={0} max={1} step="0.05" value={muted ? 0 : volume} onChange={(e) => changeVol(parseFloat(e.target.value))} aria-label="Volume" />
             </div>
             <span className="pl-time">{fmt(time)} / {fmt(duration)}</span>
 
             <div className="pl-spacer" />
 
-            {isSeries && <button className="pl-iconbtn" onClick={() => setPanel(panel === 'episodes' ? null : 'episodes')} title={t("Episodi")}><Icon name="list" size={20} /> <span className="pl-label">{t("Episodi")}</span></button>}
-            <button className="pl-iconbtn" onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title={t("Audio e sottotitoli")}><Icon name="captions" size={20} /></button>
-            {isSeries && <button className="pl-iconbtn" onClick={nextEp} disabled={current >= flat.length - 1} title={t("Episodio successivo")}><Icon name="next" size={20} /></button>}
-            <button className="pl-iconbtn" onClick={toggleFs} title={t("Schermo intero")}><Icon name={isFs ? 'fullscreenExit' : 'fullscreen'} size={20} /></button>
+            {isSeries && <button className="pl-iconbtn" data-focusable onClick={() => setPanel(panel === 'episodes' ? null : 'episodes')} title={t("Episodi")}><Icon name="list" size={20} /> <span className="pl-label">{t("Episodi")}</span></button>}
+            <button className="pl-iconbtn" data-focusable onClick={() => setPanel(panel === 'settings' ? null : 'settings')} title={t("Audio e sottotitoli")}><Icon name="captions" size={20} /></button>
+            {isSeries && <button className="pl-iconbtn" data-focusable onClick={nextEp} disabled={current >= flat.length - 1} title={t("Episodio successivo")}><Icon name="next" size={20} /></button>}
+            <button className="pl-iconbtn" data-focusable onClick={toggleFs} title={t("Schermo intero")}><Icon name={isFs ? 'fullscreenExit' : 'fullscreen'} size={20} /></button>
           </div>
         </div>
       )}
@@ -735,14 +739,14 @@ export default function Watch() {
       {isLive && (
         <div className={'pl-bottom live' + (showUI ? '' : ' hidden')}>
           <div className="pl-controls">
-            <button className="pl-iconbtn" onClick={togglePlay}><Icon name={playing ? 'pause' : 'play'} size={20} /></button>
+            <button className="pl-iconbtn" data-focusable onClick={togglePlay}><Icon name={playing ? 'pause' : 'play'} size={20} /></button>
             <div className="pl-vol">
-              <button className="pl-iconbtn" onClick={toggleMute}><Icon name={muted || volume === 0 ? 'mute' : 'volume'} size={20} /></button>
+              <button className="pl-iconbtn" data-focusable onClick={toggleMute}><Icon name={muted || volume === 0 ? 'mute' : 'volume'} size={20} /></button>
               <input type="range" min={0} max={1} step="0.05" value={muted ? 0 : volume} onChange={(e) => changeVol(parseFloat(e.target.value))} />
             </div>
             <span className="pl-live-badge"><i className="live-dot" /> LIVE</span>
             <div className="pl-spacer" />
-            <button className="pl-iconbtn" onClick={toggleFs}><Icon name={isFs ? 'fullscreenExit' : 'fullscreen'} size={20} /></button>
+            <button className="pl-iconbtn" data-focusable onClick={toggleFs}><Icon name={isFs ? 'fullscreenExit' : 'fullscreen'} size={20} /></button>
           </div>
         </div>
       )}
@@ -774,7 +778,7 @@ export default function Watch() {
             <select className="select" value={seasonView || ''} onChange={(e) => setSeasonView(e.target.value)}>
               {seasonKeys.map((s) => <option key={s} value={s}>{t("Stagione {n}", { n: s })}</option>)}
             </select>
-            <button className="pl-iconbtn" onClick={() => setPanel(null)}><Icon name="close" size={20} /></button>
+            <button className="pl-iconbtn" data-focusable onClick={() => setPanel(null)}><Icon name="close" size={20} /></button>
           </div>
           <div className="pl-ep-list">
             {epList.map((ep, idx) => {

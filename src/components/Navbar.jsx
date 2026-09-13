@@ -20,7 +20,7 @@ export default function Navbar() {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
-    <header className={'nav' + (scrolled ? ' scrolled' : '') + (open ? ' menu-open' : '')}>
+    <header className={'nav' + (scrolled ? ' scrolled' : '') + (open ? ' menu-open' : '')} data-focus-group>
       <button
         className="nav-burger"
         onClick={() => setOpen((v) => !v)}
@@ -30,21 +30,20 @@ export default function Navbar() {
         <span /><span /><span />
       </button>
 
-      <Link to="/" className="logo">RETLIX</Link>
+      <Link to="/" className="logo" data-focusable tabIndex={0}>RETFLIX</Link>
 
       <nav className="nav-links">
-        <NavLink to="/" end>{t('Home')}</NavLink>
-        <NavLink to="/movies">{t('Film')}</NavLink>
-        <NavLink to="/series">{t('Serie TV')}</NavLink>
-        <NavLink to="/live">{t('Live TV')}</NavLink>
+        <NavLink to="/" end data-focusable tabIndex={0}>{t('Home')}</NavLink>
+        <NavLink to="/movies" data-focusable tabIndex={0}>{t('Film')}</NavLink>
+        <NavLink to="/series" data-focusable tabIndex={0}>{t('Serie TV')}</NavLink>
+        <NavLink to="/live" data-focusable tabIndex={0}>{t('Live TV')}</NavLink>
       </nav>
 
       <div className="nav-right">
-        {/* Netflix-style: a plain magnifier that opens the search page (autofocuses) */}
-        <button className="nav-icon" onClick={() => navigate('/search')} title={t('Cerca')} aria-label={t('Cerca')}>
+        <button className="nav-icon" onClick={() => navigate('/search')} title={t('Cerca')} aria-label={t('Cerca')} data-focusable>
           <Icon name="search" size={22} />
         </button>
-        <Link to="/settings" className="nav-icon" title={t('Impostazioni')} aria-label={t('Impostazioni')}><Icon name="settings" size={20} /></Link>
+        <Link to="/settings" className="nav-icon" title={t('Impostazioni')} aria-label={t('Impostazioni')} data-focusable><Icon name="settings" size={20} /></Link>
         <div className="avatar">U</div>
       </div>
     </header>
