@@ -36,6 +36,15 @@ export default function Browse({ type }) {
   const [catRows, setCatRows] = useState([]);
   const [catRowsLoading, setCatRowsLoading] = useState(false);
 
+  // TV: category picker state — persisted in _savedState (must be before effects that use it)
+  const [showCatPicker, _setShowCatPicker] = useState(
+    saved.showCatPicker !== undefined ? saved.showCatPicker : (saved.category ? false : true)
+  );
+  function setShowCatPicker(val) {
+    _setShowCatPicker(val);
+    _savedState[type] = Object.assign({}, _savedState[type] || {}, { showCatPicker: val });
+  }
+
   // Wrapped setters that also update _savedState
   function setCategory(val) {
     _setCategory(val);
@@ -101,15 +110,6 @@ export default function Browse({ type }) {
       restorePageState(stateKey, 300);
     }
   }, [loading, items.length, showCatPicker]);
-
-  // TV: category picker state — persisted in _savedState
-  const [showCatPicker, _setShowCatPicker] = useState(
-    saved.showCatPicker !== undefined ? saved.showCatPicker : (saved.category ? false : true)
-  );
-  function setShowCatPicker(val) {
-    _setShowCatPicker(val);
-    _savedState[type] = Object.assign({}, _savedState[type] || {}, { showCatPicker: val });
-  }
 
   // Adult filter for category names
   var ADULT_RE = /xxx|porn|adult|18\+|erotic|erotico|porno|hentai|sex|for\s*adults|per\s*adulti|mature|milf|lesbian|gay|fetish|bdsm|strip|nude|nud[io]|hard\s*core|hardcore|kamasutra|playboy|brazzers|bang\s*bros|naughty|x\s*rated|xrated/i;
